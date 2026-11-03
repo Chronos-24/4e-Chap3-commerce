@@ -366,7 +366,7 @@ table.rec th{background:color-mix(in srgb,var(--navy) 10%,var(--card))}
 <dialog id="dlgExport" aria-labelledby="exTitle">
  <div class="dlg">
   <h2 id="exTitle">Exporter mon travail</h2>
-  <p class="hint-note">Ton travail est enregistré automatiquement sur cet ordinateur. Pour le rendre, choisis une option.</p>
+  <p class="hint-note">Ton travail est enregistré automatiquement sur cet ordinateur. Pour le rendre, choisis une option. Le fichier .json te permet de reprendre ton travail plus tard, ou sur un autre ordinateur, depuis la page d’accueil.</p>
   <div class="row" style="flex-direction:column;align-items:stretch">
     <button type="button" class="b primary" id="exDocx">⬇ Télécharger en Word (.docx)</button>
     <button type="button" class="b" id="exJson">💾 Sauvegarder mon travail (.json)</button>
@@ -763,7 +763,37 @@ function save(quiet){
 function load(){
   try{ const r = localStorage.getItem(KEY); if(!r) return null; return JSON.parse(r); }catch(e){ return null; }
 }
+/* ---- reprendre un travail sauvegardé (.json) ---- */
+const ACT_ID = "bordeaux4e";
+function importBloc(){
+  const inp = el("input",{type:"file",accept:".json,application/json",style:"display:none","aria-label":"Choisir le fichier de sauvegarde",
+    onchange:(e)=>{ const fl=e.target.files&&e.target.files[0]; if(fl) importerJSON(fl); e.target.value=""; }});
+  return el("div",{class:"aidebox",style:"margin-top:16px"},
+    el("b",{},"Tu as déjà commencé cette activité ? "),
+    "Charge le fichier .json que tu as sauvegardé pour reprendre là où tu t’étais arrêté.",
+    el("div",{class:"row",style:"margin-top:8px"},
+      el("button",{class:"b",type:"button",onclick:()=>inp.click()},"📂 Reprendre mon travail (.json)"), inp));
+}
+function importerJSON(fl){
+  const r = new FileReader();
+  r.onload = ()=>{
+    let o;
+    try{ o = JSON.parse(r.result); }catch(e){ toast("Ce fichier n’est pas lisible : choisis le fichier .json de ta sauvegarde."); return; }
+    if(!o || typeof o!=="object" || !o.travail || typeof o.travail!=="object"){ toast("Ce fichier ne contient pas de sauvegarde d’activité."); return; }
+    if(o.activite!==ACT_ID){ toast("Ce fichier correspond à une autre activité : choisis la bonne sauvegarde."); return; }
+    const t = o.travail;
+    S = Object.assign({ nom:"", niveau:"parcours", ecran:"accueil", rep:{}, val:{}, aide:{}, txt:{}, maj:null }, t);
+    ["rep","val","aide","txt"].forEach(k=>{ if(!S[k] || typeof S[k]!=="object") S[k]={}; });
+    if(!["decouverte","parcours","expert"].includes(S.niveau)) S.niveau="parcours";
+    if(S.ecran!=="accueil" && S.ecran!=="bilan" && !MISSIONS.some(m=>m.k===S.ecran)) S.ecran="accueil";
+    EX = exos(S.niveau); save(true); render(); window.scrollTo(0,0);
+    toast("Travail de "+(S.nom||"l’élève")+" rechargé : tu peux continuer.");
+  };
+  r.onerror = ()=>toast("Impossible de lire ce fichier.");
+  r.readAsText(fl);
+}
 function toast(m){
+
   const d=document.createElement("div"); d.className="toast"; d.textContent=m;
   document.body.appendChild(d); setTimeout(()=>d.remove(),2200);
   document.getElementById("live").textContent=m;
@@ -1038,7 +1068,8 @@ function ecranAccueil(){
       el("button",{class:"b primary",type:"button",onclick:()=>{
         if(!S.nom.trim()){ toast("Écris d’abord ton prénom et ton nom"); document.getElementById("nom").focus(); return; }
         S.ecran="m1"; save(true); render(); window.scrollTo(0,0); }},"Embarquer →"),
-      anc && anc.nom ? el("span",{class:"hint-note"},"Travail trouvé sur cet ordinateur : "+anc.nom) : null)));
+      anc && anc.nom ? el("span",{class:"hint-note"},"Travail trouvé sur cet ordinateur : "+anc.nom) : null),
+    importBloc()));
 
   w.appendChild(el("div",{class:"card"},
     el("h2",{},"Avant de commencer"),
